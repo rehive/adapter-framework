@@ -1,7 +1,8 @@
 # Bitcoin Adapter for Rehive
-This adapter plugs into Rehive to provide Bitcoin transaction support and hotwallet management.
+Base project for integrating third-party payment processors or cryptocurrencies.
 
 ## Notes:
+The django project is located in the /src directory. 
 
-Coming soon. Work in progress.
+Documentation is coming soon. Work in progress.
 
