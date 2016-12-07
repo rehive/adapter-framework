@@ -1,4 +1,4 @@
-# Bitcoin Adapter for Rehive
+# Rehive's Adapter Framework
 Base project for integrating third-party payment processors or cryptocurrencies.
 
 ## Notes:
