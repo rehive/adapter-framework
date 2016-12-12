@@ -1,169 +1,174 @@
 from logging import getLogger
 
-from decimal import Decimal
+import datetime
 from django.contrib.postgres.fields import JSONField
 from django.db import models
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.utils.timezone import utc
 
-from .api import Interface, WebhookReceiveInterface
+from .api import Interface
 
 logger = getLogger('django')
 
 
-class MoneyField(models.DecimalField):
-    """Decimal Field with hardcoded precision of 28 and a scale of 18."""
-
-    def __init__(self, verbose_name=None, name=None, max_digits=28,
-                 decimal_places=18, **kwargs):
-        super(MoneyField, self).__init__(verbose_name, name, max_digits, decimal_places, **kwargs)
-
-
-class Currency(models.Model):
-    code = models.CharField(max_length=12, null=True, blank=True, db_index=True)
-    description = models.CharField(max_length=20, null=True, blank=True)
-    symbol = models.CharField(max_length=6, null=True, blank=True)
-    unit = models.CharField(max_length=15, null=True, blank=True)
-    divisibility = models.IntegerField(default=2)
+class User(models.Model):
+    """
+    Model for storing info linking to a Rehive User.
+    """
+    identifier = models.CharField(max_length=200, null=False, blank=False, unique=True)
+    first_name = models.CharField(max_length=30, blank=True, null=True)
+    last_name = models.CharField(max_length=30, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True, )
+    mobile_number = models.CharField(max_length=24, blank=True, null=True)
+    created = models.DateTimeField()
+    updated = models.DateTimeField()
 
     def __str__(self):
-        return self.code
+        return str(self.identifier)
+
+    def save(self, *args, **kwargs):
+        if not self.id:  # On create
+            self.created = datetime.datetime.now(tz=utc)
+
+        self.updated = datetime.datetime.now(tz=utc)
+        return super(User, self).save(*args, **kwargs)
 
 
-# Log of all receive transactions processed.
-class ReceiveTransaction(models.Model):
+class TransactionManager(models.Manager):
+    """
+    Manager functions for creating transactions.
+    """
+    def create_deposit(self, user, amount, fee, currency, note, metadata, account_name=None):
+
+        if account_name == 'None':
+            account = AdminAccount.objects.get(type='deposit', default='True')
+        else:
+            account = AdminAccount.objects.get(name=account_name)  # for multiple account scenarios.
+
+        tx = self.create(tx_type='deposit',
+                         user=user,
+                         to_reference=user.identifier,
+                         amount=amount,
+                         fee=fee,
+                         currency=currency,
+                         note=note,
+                         admin_account=account,
+                         metadata=metadata)
+
+        return tx
+
+    def create_withdraw(self, user, amount, fee, currency, note, metadata, account_name=None):
+
+        if account_name == 'None':
+            account = AdminAccount.objects.get(type='deposit', default='True')
+        else:
+            account = AdminAccount.objects.get(name=account_name)  # for multiple account scenarios.
+
+        tx = self.create(tx_type='withdraw',
+                         user=user,
+                         amount=amount,
+                         fee=fee,
+                         currency=currency,
+                         note=note,
+                         admin_account=account,
+                         metadata=metadata)
+
+        return tx
+
+
+class Transaction(models.Model):
+    """
+    Third-party transaction model. Includes methods for creating/ confirming on  Rehive and for executing with the
+    third-party.
+    """
     STATUS = (
         ('Waiting', 'Waiting'),
         ('Pending', 'Pending'),
         ('Confirmed', 'Confirmed'),  # Confirmed but not yet uploaded to rehive
         ('Complete', 'Complete'),  # Confirmed and uploaded to rehive
         ('Failed', 'Failed'),
+        ('Cancelled', 'Cancelled'),
     )
-    user_account = models.ForeignKey('adapter.UserAccount')
-    external_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    user = models.ForeignKey('adapter.User', null=True, blank=True)
     rehive_code = models.CharField(max_length=100, null=True, blank=True, db_index=True)
-    recipient = models.CharField(max_length=200, null=True, blank=True)
-    amount = MoneyField(default=Decimal(0))
-    currency = models.ForeignKey('adapter.Currency')
-    issuer = models.CharField(max_length=200, null=True, blank=True)
-    rehive_response = JSONField(null=True, blank=True, default={})
-    status = models.CharField(max_length=24, choices=STATUS, null=True, blank=True, db_index=True)
-    data = JSONField(null=True, blank=True, default={})
+    external_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    tx_type = models.CharField(max_length=50, choices=TYPE, null=False, blank=False)
+    to_reference = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    from_reference = models.CharField(max_length=100, null=True, blank=True, db_index=True)
+    amount = models.BigIntegerField(default=0)
+    fee = models.BigIntegerField(default=0)
+    currency = models.CharField(max_length=12, null=False, blank=False)
+    status = models.CharField(max_length=24, choices=STATUS, null=True, blank=True)
+    note = models.TextField(max_length=100, null=True, blank=True, default='')
     metadata = JSONField(null=True, blank=True, default={})
+    rehive_response = JSONField(null=True, blank=True, default={})
+    admin_account = models.ForeignKey('adapter.AdminAccount')
+    created = models.DateTimeField()
+    updated = models.DateTimeField()
+    completed = models.DateTimeField(null=True, blank=True)
+
+    objects = TransactionManager()
+
+    def save(self, *args, **kwargs):
+        if not self.id:  # On create
+            self.created = datetime.datetime.now(tz=utc)
+
+        self.updated = datetime.datetime.now(tz=utc)
+        return super(Transaction, self).save(*args, **kwargs)
 
     def upload_to_rehive(self):
-        from .rehive_api import create_or_confirm_rehive_receive
+        from .rehive_tasks import create_or_confirm_transaction
         self.refresh_from_db()
-        if not self.rehive_code:
-            if self.status == 'Pending':
-                create_or_confirm_rehive_receive.delay(self.id, confirm=False)
-        else:
-            if self.status == 'Confirmed':
-                create_or_confirm_rehive_receive.delay(self.id, confirm=True)
+        create_or_confirm_transaction(self.id)
 
-
-# Log of all processed sends.
-class SendTransaction(models.Model):
-    STATUS = (
-        ('Pending', 'Pending'),
-        ('Complete', 'Complete'),
-    )
-    TYPE = (
-        ('send', 'Send'),
-        ('receive', 'Receive'),
-    )
-    admin_account = models.ForeignKey('adapter.AdminAccount')
-    external_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
-    rehive_code = models.CharField(max_length=100, null=True, blank=True, db_index=True)
-    recipient = models.CharField(max_length=200, null=True, blank=True)
-    amount = MoneyField(default=Decimal(0))
-    currency = models.ForeignKey('adapter.Currency')
-    issuer = models.CharField(max_length=200, null=True, blank=True)
-    rehive_request = JSONField(null=True, blank=True, default={})
-    data = JSONField(null=True, blank=True, default={})
-    metadata = JSONField(null=True, blank=True, default={})
-
-    def save(self, *args, **kwargs):
-        if not self.id:  # On create
-            self.admin_account = AdminAccount.objects.get(default=True)
-        return super(SendTransaction, self).save(*args, **kwargs)
-
-    def execute(self):
-        self.admin_account.send(self)
-
-
-# Accounts for identifying Rehive users.
-# Passive account, receive only.
-class UserAccount(models.Model):
-    rehive_id = models.CharField(max_length=100, null=True, blank=True)  # id for identifying user on rehive
-    account_id = models.CharField(max_length=200, null=True, blank=True)  # crypto address
-    admin_account = models.ForeignKey('adapter.AdminAccount')
-    metadata = JSONField(null=True, blank=True, default={})
-
-    def save(self, *args, **kwargs):
-        if not self.id:  # On create
-            logger.info('Fetching account_id.')
-            self.admin_account = AdminAccount.objects.get(name='receive')
-            self._new_account_id()
-        return super(UserAccount, self).save(*args, **kwargs)
-
-    def _new_account_id(self):
+    def execute(selfs):
         interface = Interface(account=self.admin_account)
+        pass
 
-        # Get and save user account ID:
-        self.account_id = interface.get_user_account_id()
-
-        return self.account_id
-
-    def subscribe_to_hooks(self):
-        # Subscribe to webhooks for receive transactions:
-        webhooks = WebhookReceiveInterface(account=self)
-        webhooks.subscribe_to_all()
-
-
-@receiver(post_save, sender=UserAccount, dispatch_uid="subscribe_to_receive_hooks")
-def subscribe_to_receive_hooks(sender, instance, created, **kwargs):
-    # Kwargs raw is used to check if data is loaded from fixtures.
-    if created and not kwargs.get('raw', False):
-        logger.info('Subscribing to webhooks for receive transactions')
-        instance.subscribe_to_hooks()
+    def cancel(self):
+        self.status = 'Cancelled'
+        self.completed = datetime.datetime.now(tz=utc)
+        self.save()
 
 
 # HotWallet/ Operational Accounts for sending or receiving on behalf of users.
 # Admin accounts usually have a secret key to authenticate with third-party provider (or XPUB for key generation).
 class AdminAccount(models.Model):
+    """Operational Account with third party for depositing/ withdrawing on behalf of users."""
+
     name = models.CharField(max_length=100, null=True, blank=True)
-    rehive_id = models.CharField(max_length=100, null=True, blank=True)  # id for identifying admin on rehive
-    type = models.CharField(max_length=100, null=True, blank=True)  # some more descriptive info.
+    type = models.CharField(max_length=100, null=True, blank=True)  # e.g. deposit or withdraw
     secret = JSONField(null=True, blank=True, default={})  # crypto seed, private key or XPUB
     metadata = JSONField(null=True, blank=True, default={})
     default = models.BooleanField(default=False)
 
-    def send(self, tx: SendTransaction) -> bool:
-        from .rehive_api import confirm_rehive_transaction
+    def execute(self, tx: Transaction) -> bool:
+        """Execute transaction with third-party and update Rehive."""
+        from .rehive_tasks import create_or_confirm_transaction
         """
         Initiates a send transaction using the Admin account.
         """
         interface = Interface(account=self)
-        interface.send(tx)
-        confirm_rehive_transaction(tx_id=tx.id, tx_type='send')
+        interface.execute(tx)  # Execute transaction with third-party
+        create_or_confirm_transaction(tx_id=tx.id)  # upload the transaction to rehive
         return True
 
     # Return account id (e.g. Bitcoin address)
-    def get_account_id(self) -> str:
+    def get_account_ref(self) -> str:
         """
         Returns third party identifier of Admin account. E.g. Bitcoin address.
         """
         interface = Interface(account=self)
         return interface.get_account_id()
 
-    def get_balance(self) -> int:
+    def get_user_ref(self, user: User) -> str:
+        """
+        Returns reference for a specific user (e.g. bitcoin receive address).
+        :param user:
+        :return:
+        """
+        interface = Interface(account=self)
+        return interface.get_user_ref(user=user)
+
+    def get_account_balance(self) -> int:
         interface = Interface(account=self)
         return interface.get_account_balance()
-
-
-class ReceiveWebhook(models.Model):
-    webhook_type = models.CharField(max_length=50, null=True, blank=True)
-    webhook_id = models.CharField(max_length=50, null=True, blank=True)
-    user_account = models.ForeignKey(UserAccount)
-    callback_url = models.CharField(max_length=150, blank=False)

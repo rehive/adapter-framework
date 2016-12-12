@@ -1,7 +1,6 @@
 from logging import getLogger
 
-from .models import SendTransaction, UserAccount
-from celery import shared_task
+from .models import Transaction
 
 logger = getLogger('django')
 
@@ -15,33 +14,21 @@ class AbstractBaseInteface:
         # Always linked to an AdminAccount
         self.account = account
 
-    def get_user_account_id(self):
+    def get_user_ref(self, user) -> dict:
         """
-        Generated or retrieve an account ID from third-party API or cryptocurrency.
-        """
-        raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_user_account_id() method')
-
-    def get_user_account_details(self) -> dict:
-        """
-        Returns account id and details
+        Returns  third-party reference for specific user and details
         Should return dict of the form:
-        {'account_id': ...
+        {'reference': ...
          'details': {...}
          }
         """
-        raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_user_account_details() method')
+        raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_user_account_id() method')
 
-    def get_account_id(self):
+    def get_account_ref(self) -> dict:
         """
-        Generated or retrieve an account ID from third-party API or cryptocurrency.
-        """
-        raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_account_id() method')
-
-    def get_account_details(self) -> dict:
-        """
-        Returns account id and details
+        Returns third-party operational/ admin account reference and details
         Should return dict of the form:
-        {'account_id': ...
+        {'reference': ...
          'details': {...}
          }
         """
@@ -49,23 +36,22 @@ class AbstractBaseInteface:
 
     def get_account_balance(self) -> dict:
         """
-        Returns account balance and details:
+        Returns third-party account balance and details:
         Should return dict of the form
         {'balance': balance,
-         'details': {'divisibility': 7,
-                     'currency': 'XLM'}
-        }
+         'currency': 'XLM'}
         """
         raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_account_balance() method')
 
-    def send(self, tx: SendTransaction) -> dict:
+    def execute(self, tx: Transaction) -> dict:
         """
-        Sends transaction from account and return transaction details.
+        Excecutes transaction transaction with third-party and returns transaction details.
         Should return dict of the form:
         {'tx_id': 987139917439174
          'details': {...}
         }
         """
+        raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_account_balance() method')
 
 
 class Interface(AbstractBaseInteface):
@@ -73,31 +59,4 @@ class Interface(AbstractBaseInteface):
     Interface implementation.
     """
     pass
-
-
-class AbstractReceiveWebhookInterfaceBase:
-    """
-    If an external webhook service is used to create receive transactions,
-    these can be subscribed to using this interface.
-    """
-    def __init__(self, account):
-        # Always linked to an AdminAccount
-        self.account = account
-
-    def subscribe_to_all(self):
-        raise NotImplementedError()
-
-    def unsubscribe_from_all(self):
-        raise NotImplementedError()
-
-
-class WebhookReceiveInterface(AbstractReceiveWebhookInterfaceBase):
-    """
-    Webhook implementation
-    """
-
-
-@shared_task()
-def process_webhook_receive(webhook_type, receive_id, data):
-    user_account = UserAccount.objects.get(id=receive_id)
-    # TODO: add webhook logic for creating and confirming transactions here.
+    # Implement Abstract base class methods here using the third-party's API.

@@ -1,26 +1,19 @@
-import urllib.parse
-from collections import OrderedDict
-
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import exceptions
 from rest_framework.generics import GenericAPIView
 from rest_framework.reverse import reverse
-from rest_framework.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from rest_framework.views import APIView
 
-from .api import process_webhook_receive
-from .utils import from_cents, input_to_json
+from src.adapter.authentication import ExternalJWTAuthentication
+from src.adapter.permissions import UserPermission, AdminPermission
 from .api import Interface
-from .models import UserAccount, AdminAccount, SendTransaction, Currency
-from .permissions import AdapterGlobalPermission
-
+from .models import AdminAccount, Transaction
 from logging import getLogger
 
 from .throttling import NoThrottling
 
-from .serializers import TransactionSerializer, UserAccountSerializer
+from .serializers import TransactionSerializer
 
 logger = getLogger('django')
 
@@ -54,41 +47,29 @@ def adapter_root(request, format=None):
 
     """
 
-    return Response({'Purchase': reverse('adapter-api:purchase',
-                                         request=request,
-                                         format=format),
-                     'Withdraw': reverse('adapter-api:withdraw',
+    return Response({'Withdraw': reverse('adapter-api:withdraw',
                                          request=request,
                                          format=format),
                      'Deposit': reverse('adapter-api:deposit',
                                         request=request,
                                         format=format),
-                     'Send': reverse('adapter-api:send',
-                                     request=request,
-                                     format=format),
                      })
-
-
-class PurchaseView(GenericAPIView):
-    allowed_methods = ('POST',)
-    throttle_classes = (NoThrottling,)
-    serializer_class = TransactionSerializer
-    permission_classes = (AdapterGlobalPermission,)
-
-    def post(self, request, *args, **kwargs):
-        return Response({'status': 'success'})
-
-    def get(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed('GET')
 
 
 class WithdrawView(GenericAPIView):
     allowed_methods = ('POST',)
     throttle_classes = (NoThrottling,)
     serializer_class = TransactionSerializer
-    permission_classes = (AdapterGlobalPermission,)
+    authentication_classes = (ExternalJWTAuthentication,)
+    permission_classes = (UserPermission,)
 
     def post(self, request, *args, **kwargs):
+        tx_code = request.data.get('tx_code')
+        to_user = request.data.get('to_user')
+        amount = request.data.get('amount')
+        currency = request.data.get('currency')
+
+        Transaction.objects.create_withdraw()
         return Response({'status': 'success'})
 
     def get(self, request, *args, **kwargs):
@@ -99,69 +80,28 @@ class DepositView(GenericAPIView):
     allowed_methods = ('POST',)
     throttle_classes = (NoThrottling,)
     serializer_class = TransactionSerializer
-    permission_classes = (AdapterGlobalPermission,)
+    authentication_classes = (ExternalJWTAuthentication,)
+    permission_classes = (UserPermission,)
 
     def post(self, request, *args, **kwargs):
-        return Response({'status': 'success'})
-
-    def get(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed('GET')
-
-
-class SendView(GenericAPIView):
-    allowed_methods = ('POST',)
-    throttle_classes = (NoThrottling,)
-    serializer_class = TransactionSerializer
-    authentication_classes = []
-    permission_classes = (AdapterGlobalPermission,)
-
-    def post(self, request, *args, **kwargs):
-        logger.info('Received send request')
+        logger.log('Received deposit request.')
         tx_code = request.data.get('tx_code')
         to_user = request.data.get('to_user')
-        amount = from_cents(request.data.get('amount'), 8)
+        amount = request.data.get('amount')
         currency = request.data.get('currency')
-        issuer = request.data.get('issuer')
 
-        logger.debug(request.data)
-        logger.info('To: ' + to_user)
-        logger.info('Amount: ' + str(amount))
-        logger.info('Currency: ' + currency)
-
-        currency_obj = Currency.objects.get_or_create(code=currency)
-        tx = SendTransaction.objects.create(rehive_code=tx_code,
-                                            recipient=to_user,
-                                            amount=amount,
-                                            currency=currency_obj,
-                                            issuer=issuer)
-        if tx.currency == 'XBT':
-            tx.execute()
+        Transaction.objects.create_withdraw()
 
         return Response({'status': 'success'})
 
     def get(self, request, *args, **kwargs):
         raise exceptions.MethodNotAllowed('GET')
-
-
-class BalanceView(APIView):
-    allowed_methods = ('GET',)
-    throttle_classes = (NoThrottling,)
-    permission_classes = (AllowAny, AdapterGlobalPermission,)
-
-    def post(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed('POST')
-
-    def get(self, request, *args, **kwargs):
-        account = AdminAccount.objects.get(default=True)
-        interface = Interface(account=account)
-        balance_details = interface.get_account_balance()
-        return Response({'balance': balance_details})
 
 
 class OperatingAccountView(APIView):
     allowed_methods = ('GET',)
     throttle_classes = (NoThrottling,)
-    permission_classes = (AdapterGlobalPermission,)
+    permission_classes = (AdminPermission,)
 
     def post(self, request, *args, **kwargs):
         raise exceptions.MethodNotAllowed('POST')
@@ -169,56 +109,26 @@ class OperatingAccountView(APIView):
     def get(self, request, *args, **kwargs):
         account = AdminAccount.objects.get(default=True)
         interface = Interface(account=account)
-        details = interface.get_account_details()
+        details = interface.get_account_ref()
         return Response(details)
 
 
-class UserAccountView(GenericAPIView):
-    allowed_methods = ('POST',)
-    throttle_classes = (NoThrottling,)
-    permission_classes = (AdapterGlobalPermission,)
-    serializer_class = UserAccountSerializer
-
-    def post(self, request, *args, **kwargs):
-        logger.info('User account requested.')
-        logger.info(request.data)
-        user_id = request.data.get('user_id')
-        # Check if metadata is specified:
-        metadata = input_to_json(request.data.get('metadata'))
-
-        # Get Account ID:
-        user_account, created = UserAccount.objects.get_or_create(rehive_id=user_id)
-
-        interface = Interface(account=user_account)
-
-        details = interface.get_user_account_details()
-
-        return Response(details)
-
-    def get(self, request, *args, **kwargs):
-        raise exceptions.MethodNotAllowed('GET')
-
-
-class WebhookView(APIView):
-    allowed_methods = ('POST',)
-    permission_classes = (AllowAny,)
-
-    def post(self, request, *args, **kwargs):
-        receive_id = request.GET.get('id', '')
-        hook_name = self.kwargs.get('hook_name')
-        data = request.data
-
-        logger.info('Webhook received')
-        logger.debug(data)
-
-        if not receive_id:
-            raise Exception('Bad blockcypher post: no receive_id')
-
-        process_webhook_receive.delay(webhook_type=hook_name,
-                                      receive_id=receive_id,
-                                      data=data)
-
-        return Response({}, status=HTTP_200_OK)
-
-    def get(self, request, *args, **kwargs):
-        return Response({}, status=HTTP_404_NOT_FOUND)
+# class UserRefView(GenericAPIView):
+#     allowed_methods = ('POST',)
+#     throttle_classes = (NoThrottling,)
+#     authentication_classes = (ExternalJWTAuthentication,)
+#     permission_classes = (UserPermission,)
+#     serializer_class = UserRefSerializer
+#
+#     def post(self, request, *args, **kwargs):
+#         logger.info('User account requested.')
+#         logger.info(request.data)
+#
+#         interface = Interface(account=user.account)
+#
+#         details = interface.get_user_account_details()
+#
+#         return Response(details)
+#
+#     def get(self, request, *args, **kwargs):
+#         raise exceptions.MethodNotAllowed('GET')

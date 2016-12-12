@@ -20,14 +20,3 @@ class TransactionSerializer(serializers.Serializer):
     created = serializers.CharField(required=True)
     note = serializers.CharField(required=False)
     metadata = serializers.JSONField(required=False)
-
-
-class UserAccountSerializer(serializers.Serializer):
-    user_id = serializers.CharField(required=True)
-    metadata = serializers.JSONField(required=False)
-
-
-class AddAssetSerializer(serializers.Serializer):
-    code = serializers.CharField(required=True)
-    issuer = serializers.CharField(required=True)
-    metadata = serializers.JSONField(required=False)

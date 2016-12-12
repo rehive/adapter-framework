@@ -34,15 +34,5 @@ TASK_QUEUE = os.environ.get('TASK_QUEUE', '') in ['True', True, 'true']
 # secrets
 SECRET_KEY = os.environ.get('DJANGO_SECRET', 'dvznxtu08$$a9jxjh=jkkswbe5-dw5+ea%4k((1k69ooi7d(hj')
 
-# Get the platform URL for the adapter (Rehive)
 REHIVE_API_URL = os.environ.get('REHIVE_API_URL', '')
-
-# Get the admin token for platform requests (Rehive)
-REHIVE_API_TOKEN = os.environ.get('REHIVE_API_TOKEN', '')
-
-# TODO: Replace this with user accounts and tokens.
-ADAPTER_SECRET_KEY = os.environ.get('ADAPTER_SECRET_KEY', 'secret')
-BLOCKCYPHER_TOKEN = os.environ.get('BLOCKCYPHER_TOKEN', '')
-
-# Separate secret as for blockcypher this is passed over http requests as a query parameter.
-BLOCKCYPHER_ADAPTER_SECRET = os.environ.get('BLOCKCYPHER_ADAPTER_SECRET', '')
+REHIVE_ADMIN_TOKEN = os.environ.get('REHIVE_ADMIN_TOKEN', '')
