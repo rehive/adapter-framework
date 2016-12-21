@@ -5,8 +5,8 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from src.adapter.authentication import ExternalJWTAuthentication
-from src.adapter.permissions import UserPermission, AdminPermission
+from .authentication import ExternalJWTAuthentication
+from .permissions import UserPermission, AdminPermission
 from .api import Interface
 from .models import AdminAccount, Transaction
 from logging import getLogger
@@ -64,13 +64,21 @@ class WithdrawView(GenericAPIView):
     permission_classes = (UserPermission,)
 
     def post(self, request, *args, **kwargs):
-        tx_code = request.data.get('tx_code')
-        to_user = request.data.get('to_user')
-        amount = request.data.get('amount')
-        currency = request.data.get('currency')
+        # Get user model from auth user object:
+        auth_user = request.user
+        user = auth_user.details
 
-        Transaction.objects.create_withdraw()
-        return Response({'status': 'success'})
+        tx = Transaction.objects.create_withdraw(user=user,
+                                                 amount=request.data.get('amount'),
+                                                 currency=request.data.get('currency'),
+                                                 note=request.data.get('note'),
+                                                 metadata=request.data.get('metadata'))
+
+        # Execute transaction using third-party API and upload to Rehive:
+        tx.execute()
+
+        return Response({'status': 'success',
+                         'data': {'tx_code': tx.rehive_code}})
 
     def get(self, request, *args, **kwargs):
         raise exceptions.MethodNotAllowed('GET')
@@ -84,15 +92,21 @@ class DepositView(GenericAPIView):
     permission_classes = (UserPermission,)
 
     def post(self, request, *args, **kwargs):
-        logger.log('Received deposit request.')
-        tx_code = request.data.get('tx_code')
-        to_user = request.data.get('to_user')
-        amount = request.data.get('amount')
-        currency = request.data.get('currency')
+        # Get user model from auth user object:
+        auth_user = request.user
+        user = auth_user.details
 
-        Transaction.objects.create_withdraw()
+        tx = Transaction.objects.create_deposit(user=user,
+                                                amount=request.data.get('amount'),
+                                                currency=request.data.get('currency'),
+                                                note=request.data.get('note'),
+                                                metadata=request.data.get('metadata'))
 
-        return Response({'status': 'success'})
+        # Execute transaction using third-party API and upload to Rehive:
+        tx.execute()
+
+        return Response({'status': 'success',
+                         'data': {'tx_code': tx.rehive_code}})
 
     def get(self, request, *args, **kwargs):
         raise exceptions.MethodNotAllowed('GET')
@@ -101,6 +115,7 @@ class DepositView(GenericAPIView):
 class OperatingAccountView(APIView):
     allowed_methods = ('GET',)
     throttle_classes = (NoThrottling,)
+    authentication_classes = ()
     permission_classes = (AdminPermission,)
 
     def post(self, request, *args, **kwargs):
@@ -111,7 +126,6 @@ class OperatingAccountView(APIView):
         interface = Interface(account=account)
         details = interface.get_account_ref()
         return Response(details)
-
 
 # class UserRefView(GenericAPIView):
 #     allowed_methods = ('POST',)

@@ -1,4 +1,3 @@
-from datetime import timedelta
 import os
 
 CELERY_IMPORTS = ("adapter.models",)

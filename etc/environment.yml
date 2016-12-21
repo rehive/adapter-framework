@@ -1,4 +1,4 @@
-name: wander-server
+name: adapter-framework
 dependencies:
 - python=3.5
 - django

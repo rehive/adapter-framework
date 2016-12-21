@@ -1,25 +1,11 @@
 import requests
 import json
 
+from django.conf import settings
 from django.utils.encoding import smart_text
 from rest_framework import authentication, exceptions
 
-from src.config import settings
 from .models import User
-
-
-class AuthUser:
-    details = User()
-    is_authenticated = False,
-    token = None
-
-    def __str__(self):
-        return str(self.details)
-
-    def __init__(self, details=None, authenticated=False, token=None):
-        self.details = details
-        self.is_authenticated = authenticated,
-        self.token = token
 
 
 class ExternalJWTAuthentication(authentication.BaseAuthentication):
@@ -43,16 +29,13 @@ class ExternalJWTAuthentication(authentication.BaseAuthentication):
                 user.profile = data['user']['profile']
                 user.save()
 
-                adapter_user = AuthUser(details=user,
-                                        authenticated=True,
-                                        token=token)
             else:
                 raise exceptions.AuthenticationFailed('Invalid user')
 
         except (requests.exceptions.RequestException, requests.exceptions.MissingSchema) as e:
             raise exceptions.AuthenticationFailed(e)
 
-        return (adapter_user, None)  # authentication successful
+        return user, token  # authentication successful
 
     @staticmethod
     def get_jwt_value(request):

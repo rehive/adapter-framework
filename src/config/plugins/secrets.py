@@ -32,7 +32,6 @@ DEBUG = os.environ.get('DEBUG', '') in ['True', True, 'true']
 TASK_QUEUE = os.environ.get('TASK_QUEUE', '') in ['True', True, 'true']
 
 # secrets
-SECRET_KEY = os.environ.get('DJANGO_SECRET', 'dvznxtu08$$a9jxjh=jkkswbe5-dw5+ea%4k((1k69ooi7d(hj')
-
-REHIVE_API_URL = os.environ.get('REHIVE_API_URL', '')
-REHIVE_ADMIN_TOKEN = os.environ.get('REHIVE_ADMIN_TOKEN', '')
+SECRET_KEY = os.environ.get('DJANGO_SECRET')
+REHIVE_API_URL = os.environ.get('REHIVE_API_URL')
+REHIVE_ADMIN_TOKEN = os.environ.get('REHIVE_ADMIN_TOKEN')

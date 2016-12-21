@@ -42,22 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    'django.contrib.flatpages',
     'django.contrib.sites',
-
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
     'corsheaders',
-    'rest_auth',
-    'rest_auth.registration',
-    'timezone_field',
-    'django_countries',
     'rest_framework',
-    'rest_framework.authtoken',
-
-    'administration',
     'adapter',
 ]
 
@@ -70,7 +57,6 @@ MIDDLEWARE_CLASSES = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'administration.middleware.DisableCSRF',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -109,18 +95,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en'
 
-TIME_ZONE = 'Africa/Johannesburg'
-
 USE_I18N = False
 
 USE_L10N = False
 
 USE_TZ = True
-
-LANGUAGES = (
-    ('en', 'English'),
-    ('af', 'Afrikaans'),
-)
 
 # Static files (CSS, JavaScript, Images)
 # ---------------------------------------------------------------------------------------------------------------------
@@ -132,8 +111,6 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(PROJECT_DIR, 'var/www/static')
 
 STATICFILES_DIRS = [
-    # os.path.join(PROJECT_DIR, "var/www/static"),
-    # '/var/www/static/',
     os.path.join(BASE_DIR, "config/static"),
 ]
 
@@ -174,7 +151,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 )
 
 TEMPLATES[0].update({'DIRS': [os.path.join(BASE_DIR, 'config/templates'),
-                              os.path.join(BASE_DIR, 'administration/templates/'),]})
+                              os.path.join(BASE_DIR, 'adapter/templates/'),]})
 
 # Other
 # ---------------------------------------------------------------------------------------------------------------------
@@ -190,16 +167,5 @@ SITE_HEADER = 'Adapter'
 
 CACHE_DIR = os.path.join(PROJECT_DIR, 'var/cache')
 
-AUTH_USER_MODEL = 'administration.User'
-
 FORMAT_MODULE_PATH = 'config.formats'
-
-
-# Email config
-# ---------------------------------------------------------------------------------------------------------------------
-EMAIL_BACKEND = 'django_ses_backend.SESBackend'
-SERVER_EMAIL = ''
-DEFAULT_FROM_EMAIL = ''
-AWS_SES_REGION_NAME = 'eu-west-1'
-AWS_SES_REGION_ENDPOINT = 'email.eu-west-1.amazonaws.com'
 

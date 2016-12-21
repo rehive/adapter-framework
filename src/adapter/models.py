@@ -5,8 +5,6 @@ from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils.timezone import utc
 
-from .api import Interface
-
 logger = getLogger('django')
 
 
@@ -31,6 +29,9 @@ class User(models.Model):
 
         self.updated = datetime.datetime.now(tz=utc)
         return super(User, self).save(*args, **kwargs)
+
+    class Meta:
+        app_label = 'adapter'
 
 
 class TransactionManager(models.Manager):
@@ -88,6 +89,10 @@ class Transaction(models.Model):
         ('Failed', 'Failed'),
         ('Cancelled', 'Cancelled'),
     )
+    TYPE = (
+        ('deposit', 'Deposit'),
+        ('withdraw', 'Withdraw'),
+    )
     user = models.ForeignKey('adapter.User', null=True, blank=True)
     rehive_code = models.CharField(max_length=100, null=True, blank=True, db_index=True)
     external_id = models.CharField(max_length=100, null=True, blank=True, db_index=True)
@@ -120,7 +125,8 @@ class Transaction(models.Model):
         self.refresh_from_db()
         create_or_confirm_transaction(self.id)
 
-    def execute(selfs):
+    def execute(self):
+        from .api import Interface
         interface = Interface(account=self.admin_account)
         pass
 
@@ -147,6 +153,7 @@ class AdminAccount(models.Model):
         """
         Initiates a send transaction using the Admin account.
         """
+        from .api import Interface
         interface = Interface(account=self)
         interface.execute(tx)  # Execute transaction with third-party
         create_or_confirm_transaction(tx_id=tx.id)  # upload the transaction to rehive
@@ -157,8 +164,9 @@ class AdminAccount(models.Model):
         """
         Returns third party identifier of Admin account. E.g. Bitcoin address.
         """
+        from .api import Interface
         interface = Interface(account=self)
-        return interface.get_account_id()
+        return interface.get_account_ref()
 
     def get_user_ref(self, user: User) -> str:
         """
@@ -166,9 +174,11 @@ class AdminAccount(models.Model):
         :param user:
         :return:
         """
+        from .api import Interface
         interface = Interface(account=self)
         return interface.get_user_ref(user=user)
 
     def get_account_balance(self) -> int:
+        from .api import Interface
         interface = Interface(account=self)
         return interface.get_account_balance()
