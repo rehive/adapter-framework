@@ -58,5 +58,7 @@ class Interface(AbstractBaseInteface):
     """
     Interface implementation.
     """
-    pass
+    def execute(self, tx: Transaction):
+        tx.status = 'Complete'
+
     # Implement Abstract base class methods here using the third-party's API.

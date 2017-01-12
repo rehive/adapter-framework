@@ -64,7 +64,6 @@ MIDDLEWARE_CLASSES = [
 ]
 
 MIDDLEWARE_CLASSES += ['django.middleware.locale.LocaleMiddleware', ]
-MIDDLEWARE_CLASSES += ['django.contrib.flatpages.middleware.FlatpageFallbackMiddleware', ]
 
 ROOT_URLCONF = 'config.urls'
 

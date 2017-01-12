@@ -11,9 +11,10 @@ class UserPermission(permissions.BasePermission):
     """Checks if valid user"""
     def has_permission(self, request, view):
         user = request.user
-        if hasattr(user, 'details'):
-            return True
-        return False
+        return True
+        # if hasattr(user, 'details'):
+        #    return True
+        # return False
 
 
 class AdminPermission(permissions.BasePermission):

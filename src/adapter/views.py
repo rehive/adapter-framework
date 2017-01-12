@@ -65,17 +65,19 @@ class WithdrawView(GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         # Get user model from auth user object:
-        auth_user = request.user
-        user = auth_user.details
+        user = request.user
 
         tx = Transaction.objects.create_withdraw(user=user,
                                                  amount=request.data.get('amount'),
                                                  currency=request.data.get('currency'),
+                                                 to_reference=request.data.get('to_reference'),
                                                  note=request.data.get('note'),
-                                                 metadata=request.data.get('metadata'))
+                                                 metadata=request.data.get('metadata', {}))
 
         # Execute transaction using third-party API and upload to Rehive:
         tx.execute()
+        tx.upload_to_rehive()
+        tx.refresh_from_db()
 
         return Response({'status': 'success',
                          'data': {'tx_code': tx.rehive_code}})
@@ -92,18 +94,20 @@ class DepositView(GenericAPIView):
     permission_classes = (UserPermission,)
 
     def post(self, request, *args, **kwargs):
-        # Get user model from auth user object:
-        auth_user = request.user
-        user = auth_user.details
+        # Get user model from authentication backend:
+        user = request.user
 
         tx = Transaction.objects.create_deposit(user=user,
                                                 amount=request.data.get('amount'),
                                                 currency=request.data.get('currency'),
+                                                from_reference=request.data.get('from_reference'),
                                                 note=request.data.get('note'),
-                                                metadata=request.data.get('metadata'))
+                                                metadata=request.data.get('metadata', {}))
 
         # Execute transaction using third-party API and upload to Rehive:
         tx.execute()
+        tx.upload_to_rehive()
+        tx.refresh_from_db()
 
         return Response({'status': 'success',
                          'data': {'tx_code': tx.rehive_code}})
@@ -126,23 +130,3 @@ class OperatingAccountView(APIView):
         interface = Interface(account=account)
         details = interface.get_account_ref()
         return Response(details)
-
-# class UserRefView(GenericAPIView):
-#     allowed_methods = ('POST',)
-#     throttle_classes = (NoThrottling,)
-#     authentication_classes = (ExternalJWTAuthentication,)
-#     permission_classes = (UserPermission,)
-#     serializer_class = UserRefSerializer
-#
-#     def post(self, request, *args, **kwargs):
-#         logger.info('User account requested.')
-#         logger.info(request.data)
-#
-#         interface = Interface(account=user.account)
-#
-#         details = interface.get_user_account_details()
-#
-#         return Response(details)
-#
-#     def get(self, request, *args, **kwargs):
-#         raise exceptions.MethodNotAllowed('GET')

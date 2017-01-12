@@ -16,8 +16,6 @@ class ExternalJWTAuthentication(authentication.BaseAuthentication):
         try:
             r = requests.post(url, json={"token": token})
 
-            # print(r.text)
-
             if r.status_code == 200:
                 data = json.loads(r.text)
 
@@ -27,6 +25,7 @@ class ExternalJWTAuthentication(authentication.BaseAuthentication):
                 user.email = data['user']['email']
                 user.mobile_number = data['user']['mobile_number']
                 user.profile = data['user']['profile']
+                user.company = data['user']['company']
                 user.save()
 
             else:

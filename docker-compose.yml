@@ -44,7 +44,7 @@ worker_rehive_uploads:
   extends:
      service: webapp
      file: ./etc/docker-services.yml
-  command: bash -c "celery -A config.celery worker --loglevel=INFO --concurrency=1 -Q general-adapter-${HOST_NAME}"
+  command: bash -c "celery -A config.celery worker --loglevel=INFO --concurrency=1 -Q rehive-uploads-${HOST_NAME}"
   links:
     - postgres
 

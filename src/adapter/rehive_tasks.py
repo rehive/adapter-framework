@@ -3,7 +3,7 @@ from celery import shared_task
 
 import logging
 
-from . import settings
+from django.conf import settings
 
 from .exceptions import PlatformRequestFailedError
 from .models import Transaction

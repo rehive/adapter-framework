@@ -38,18 +38,18 @@ class TransactionManager(models.Manager):
     """
     Manager functions for creating transactions.
     """
-    def create_deposit(self, user, amount, fee, currency, note, metadata, account_name=None):
+    def create_deposit(self, user, from_reference, amount, currency, note, metadata, admin_account=None):
 
-        if account_name == 'None':
+        if not admin_account:
             account = AdminAccount.objects.get(type='deposit', default='True')
         else:
-            account = AdminAccount.objects.get(name=account_name)  # for multiple account scenarios.
+            account = AdminAccount.objects.get(name=admin_account)  # for multiple account scenarios.
 
         tx = self.create(tx_type='deposit',
                          user=user,
                          to_reference=user.identifier,
+                         from_reference=from_reference,
                          amount=amount,
-                         fee=fee,
                          currency=currency,
                          note=note,
                          admin_account=account,
@@ -57,17 +57,18 @@ class TransactionManager(models.Manager):
 
         return tx
 
-    def create_withdraw(self, user, amount, fee, currency, note, metadata, account_name=None):
+    def create_withdraw(self, user, to_reference, amount, currency, note, metadata, admin_account=None):
 
-        if account_name == 'None':
+        if not admin_account:
             account = AdminAccount.objects.get(type='deposit', default='True')
         else:
-            account = AdminAccount.objects.get(name=account_name)  # for multiple account scenarios.
+            account = AdminAccount.objects.get(name=admin_account)  # for multiple account scenarios.
 
         tx = self.create(tx_type='withdraw',
                          user=user,
                          amount=amount,
-                         fee=fee,
+                         from_reference=user.identifier,
+                         to_reference=to_reference,
                          currency=currency,
                          note=note,
                          admin_account=account,

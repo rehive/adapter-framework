@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import User, AdminAccount
+from .models import User, AdminAccount, Transaction
 
 
 class CustomModelAdmin(admin.ModelAdmin):
@@ -16,5 +16,10 @@ class UserAdmin(CustomModelAdmin):
 class AdminAccountAdmin(CustomModelAdmin):
     pass
 
+
+class TransactionAdmin(CustomModelAdmin):
+    pass
+
 admin.site.register(User, UserAdmin)
 admin.site.register(AdminAccount, AdminAccountAdmin)
+admin.site.register(Transaction, TransactionAdmin)
