@@ -8,13 +8,8 @@ logger = getLogger('django')
 
 
 class UserPermission(permissions.BasePermission):
-    """Checks if valid user"""
     def has_permission(self, request, view):
-        user = request.user
-        return True
-        # if hasattr(user, 'details'):
-        #    return True
-        # return False
+           return True
 
 
 class AdminPermission(permissions.BasePermission):

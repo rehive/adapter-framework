@@ -8,6 +8,23 @@ from django.utils.timezone import utc
 logger = getLogger('django')
 
 
+class ServiceAccount(models.Model):
+    company = models.CharField(max_length=100, unique=True, db_index=True)
+    token = models.CharField(max_length=200, null=False, blank=False, unique=True)
+    created = models.DateTimeField()
+    updated = models.DateTimeField()
+
+    def __str__(self):
+        return str(self.company)
+
+    def save(self, *args, **kwargs):
+        if not self.id:  # On create
+            self.created = datetime.datetime.now(tz=utc)
+
+        self.updated = datetime.datetime.now(tz=utc)
+        return super(ServiceAccount, self).save(*args, **kwargs)
+
+
 class User(models.Model):
     """
     Model for storing info linking to a Rehive User.
@@ -17,6 +34,7 @@ class User(models.Model):
     last_name = models.CharField(max_length=30, blank=True, null=True)
     email = models.EmailField(blank=True, null=True, )
     mobile_number = models.CharField(max_length=24, blank=True, null=True)
+    company = models.CharField(max_length=100, unique=True, db_index=True, blank=True, null=True)
     created = models.DateTimeField()
     updated = models.DateTimeField()
 
@@ -40,10 +58,13 @@ class TransactionManager(models.Manager):
     """
     def create_deposit(self, user, from_reference, amount, currency, note, metadata, admin_account=None):
 
+        service_account = ServiceAccount.objects.get(company=user.company)
+        admin_accounts = service_account.adminaccount_set.all()
+
         if not admin_account:
-            account = AdminAccount.objects.get(type='deposit', default='True')
+            account = admin_accounts.get(type='deposit', default='True')
         else:
-            account = AdminAccount.objects.get(name=admin_account)  # for multiple account scenarios.
+            account = admin_accounts.get(name=admin_account)  # for multiple account scenarios.
 
         tx = self.create(tx_type='deposit',
                          user=user,
@@ -59,10 +80,13 @@ class TransactionManager(models.Manager):
 
     def create_withdraw(self, user, to_reference, amount, currency, note, metadata, admin_account=None):
 
+        service_account = ServiceAccount.objects.get(company=user.company)
+        admin_accounts = service_account.adminaccount_set.all()
+
         if not admin_account:
-            account = AdminAccount.objects.get(type='deposit', default='True')
+            account = admin_accounts.get(type='deposit', default='True')
         else:
-            account = AdminAccount.objects.get(name=admin_account)  # for multiple account scenarios.
+            account = admin_accounts.get(name=admin_account)  # for multiple account scenarios.
 
         tx = self.create(tx_type='withdraw',
                          user=user,
@@ -145,6 +169,7 @@ class AdminAccount(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
     type = models.CharField(max_length=100, null=True, blank=True)  # e.g. deposit or withdraw
     secret = JSONField(null=True, blank=True, default={})  # crypto seed, private key or XPUB
+    service_account = models.ForeignKey('adapter.ServiceAccount', null=True, blank=True)
     metadata = JSONField(null=True, blank=True, default={})
     default = models.BooleanField(default=False)
 

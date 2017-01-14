@@ -69,7 +69,7 @@ class WithdrawView(GenericAPIView):
 
         tx = Transaction.objects.create_withdraw(user=user,
                                                  amount=request.data.get('amount'),
-                                                 currency=request.data.get('currency'),
+                                                 currency=request.data.get('currency', ''),
                                                  to_reference=request.data.get('to_reference'),
                                                  note=request.data.get('note'),
                                                  metadata=request.data.get('metadata', {}))

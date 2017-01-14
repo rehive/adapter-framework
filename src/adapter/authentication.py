@@ -2,10 +2,11 @@ import requests
 import json
 
 from django.conf import settings
+from django.utils.translation import ugettext_lazy as _
 from django.utils.encoding import smart_text
 from rest_framework import authentication, exceptions
 
-from .models import User
+from .models import User, ServiceAccount
 
 
 class ExternalJWTAuthentication(authentication.BaseAuthentication):
@@ -19,6 +20,11 @@ class ExternalJWTAuthentication(authentication.BaseAuthentication):
             if r.status_code == 200:
                 data = json.loads(r.text)
 
+                try:
+                    ServiceAccount.objects.get(company=data['user']['company'])
+                except ServiceAccount.DoesNotExist:
+                    raise exceptions.AuthenticationFailed(_("Inactive service"))
+
                 user, created = User.objects.get_or_create(identifier=data['user']['identifier'])
                 user.first_name = data['user']['first_name']
                 user.last_name = data['user']['last_name']
@@ -29,7 +35,7 @@ class ExternalJWTAuthentication(authentication.BaseAuthentication):
                 user.save()
 
             else:
-                raise exceptions.AuthenticationFailed('Invalid user')
+                raise exceptions.AuthenticationFailed(_('Invalid user'))
 
         except (requests.exceptions.RequestException, requests.exceptions.MissingSchema) as e:
             raise exceptions.AuthenticationFailed(e)

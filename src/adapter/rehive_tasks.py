@@ -32,7 +32,7 @@ def create_or_confirm_transaction(self, tx_id: int):
         url = getattr(settings, 'REHIVE_API_URL') + 'admins/transactions/' + tx.tx_type + '/'
 
         # Admin authorization:
-        headers = {'Authorization': 'Token ' + getattr(settings, 'REHIVE_ADMIN_TOKEN')}
+        headers = {'Authorization': 'Token ' + tx.admin_account.service_account.token}
 
         try:
             # Basic transaction data for api call:
@@ -50,6 +50,10 @@ def create_or_confirm_transaction(self, tx_id: int):
 
             if tx.tx_type == 'send':
                 data.update({'sender': tx.from_reference})
+
+            # Deposit now also has reference field. TODO: cleanup after APIv3
+            if tx.tx_type == 'deposit':
+                data.update({'from_reference': tx.from_reference})
 
             # Make api call:
             r = requests.post(url,
@@ -91,7 +95,7 @@ def create_or_confirm_transaction(self, tx_id: int):
         url = getattr(settings, 'REHIVE_API_URL') + 'admins/transactions/update/'
 
         # Add Authorization headers
-        headers = {'Authorization': 'Token ' + getattr(settings, 'REHIVE_ADMIN_TOKEN')}
+        headers = {'Authorization': 'Token ' + tx.admin_account.service_account.token}
 
         try:
             # Make request
