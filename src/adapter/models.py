@@ -151,9 +151,12 @@ class Transaction(models.Model):
         create_or_confirm_transaction(self.id)
 
     def execute(self):
-        from .api import Interface
-        interface = Interface(account=self.admin_account)
-        pass
+        from .rehive_tasks import create_or_confirm_transaction
+        from .api import INTERFACES
+        interface = INTERFACES[self.admin_account.interface](account=self.admin_account)
+        interface.execute(self)  # Execute transaction with third-party
+        create_or_confirm_transaction(tx_id=self.id)  # upload the transaction to rehive
+        return True
 
     def cancel(self):
         self.status = 'Cancelled'
@@ -168,30 +171,19 @@ class AdminAccount(models.Model):
 
     name = models.CharField(max_length=100, null=True, blank=True)
     type = models.CharField(max_length=100, null=True, blank=True)  # e.g. deposit or withdraw
+    interface = models.CharField(max_length=100, null=True, blank=True)  # Name of 3rd-party interface to use
     secret = JSONField(null=True, blank=True, default={})  # crypto seed, private key or XPUB
     service_account = models.ForeignKey('adapter.ServiceAccount', null=True, blank=True)
     metadata = JSONField(null=True, blank=True, default={})
     default = models.BooleanField(default=False)
-
-    def execute(self, tx: Transaction) -> bool:
-        """Execute transaction with third-party and update Rehive."""
-        from .rehive_tasks import create_or_confirm_transaction
-        """
-        Initiates a send transaction using the Admin account.
-        """
-        from .api import Interface
-        interface = Interface(account=self)
-        interface.execute(tx)  # Execute transaction with third-party
-        create_or_confirm_transaction(tx_id=tx.id)  # upload the transaction to rehive
-        return True
 
     # Return account id (e.g. Bitcoin address)
     def get_account_ref(self) -> str:
         """
         Returns third party identifier of Admin account. E.g. Bitcoin address.
         """
-        from .api import Interface
-        interface = Interface(account=self)
+        from .api import INTERFACES
+        interface = INTERFACES[self.interface](account=self)
         return interface.get_account_ref()
 
     def get_user_ref(self, user: User) -> str:
@@ -200,11 +192,11 @@ class AdminAccount(models.Model):
         :param user:
         :return:
         """
-        from .api import Interface
-        interface = Interface(account=self)
+        from .api import INTERFACES
+        interface = INTERFACES[self.interface](account=self)
         return interface.get_user_ref(user=user)
 
     def get_account_balance(self) -> int:
-        from .api import Interface
-        interface = Interface(account=self)
+        from .api import INTERFACES
+        interface = INTERFACES[self.interface](account=self)
         return interface.get_account_balance()

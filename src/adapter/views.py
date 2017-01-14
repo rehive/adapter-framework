@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 
 from .authentication import ExternalJWTAuthentication
 from .permissions import UserPermission, AdminPermission
-from .api import Interface
 from .models import AdminAccount, Transaction
 from logging import getLogger
 
@@ -126,7 +125,4 @@ class OperatingAccountView(APIView):
         raise exceptions.MethodNotAllowed('POST')
 
     def get(self, request, *args, **kwargs):
-        account = AdminAccount.objects.get(default=True)
-        interface = Interface(account=account)
-        details = interface.get_account_ref()
-        return Response(details)
+        return Response({})

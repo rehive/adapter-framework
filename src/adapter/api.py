@@ -54,7 +54,7 @@ class AbstractBaseInteface:
         raise NotImplementedError('subclasses of AbstractBaseUser must provide a get_account_balance() method')
 
 
-class Interface(AbstractBaseInteface):
+class StellarInterface(AbstractBaseInteface):
     """
     Interface implementation.
     """
@@ -62,3 +62,8 @@ class Interface(AbstractBaseInteface):
         tx.status = 'Complete'
 
     # Implement Abstract base class methods here using the third-party's API.
+
+
+INTERFACES = {
+    'stellar': StellarInterface
+}
